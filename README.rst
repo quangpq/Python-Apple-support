@@ -8,10 +8,12 @@ It works by downloading, patching, and building a fat binary of Python and
 selected pre-requisites, and packaging them as static libraries that can be
 included in an Xcode project.
 
-The binaries support x86_64 for macOS; arm64 for iOS and appleTV devices;
-and armv7k for watchOS. This should enable the code to run on:
+The binaries support x86_64 for macOS; arm64 for Python 3.8+; arm64 for iOS
+and appleTV devices; and armv7k for watchOS. This should enable the code to
+run on:
 
-* MacBook
+* MacBook (including M1 Apple Silicon MacBooks)
+* Mac Mini (including M1 Apple Silicon Mac minis)
 * iMac
 * Mac Pro
 * iPhone (5s or later)
@@ -31,11 +33,12 @@ Python versions are supported:
 * `Python 3.7 <https://github.com/beeware/Python-Apple-support/tree/3.7>`__
 * `Python 3.8 <https://github.com/beeware/Python-Apple-support/tree/3.8>`__
 * `Python 3.9 <https://github.com/beeware/Python-Apple-support/tree/3.9>`__
+* `Python 3.10 <https://github.com/beeware/Python-Apple-support/tree/3.10>`__
 
 Suggestions for changes should be made against the `dev branch
 <https://github.com/beeware/Python-Apple-support/tree/dev>`__; these
 will then be backported into the supported Python releases. The dev branch will
-track the most recent supported version of Python (currently, Python 3.9).
+track the most recent supported version of Python (currently, Python 3.10).
 
 See the individual branches for usage instructions.
 
