@@ -12,9 +12,9 @@ The binaries support x86_64 for macOS; arm64 for Python 3.8+; arm64 for iOS
 and appleTV devices; and armv7k for watchOS. This should enable the code to
 run on:
 
-* MacBook (including M1 Apple Silicon MacBooks)
-* Mac Mini (including M1 Apple Silicon Mac minis)
-* iMac
+* MacBook (including MacBooks using Apple Silicon)
+* iMac (including iMacs using Apple Silicon)
+* Mac Mini (including Mac Minis using Apple Silicon)
 * Mac Pro
 * iPhone (5s or later)
 * iPad (5th gen or later)
