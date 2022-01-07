@@ -29,7 +29,6 @@ The master branch of this repository has no content; there is an
 independent branch for each supported version of Python. The following
 Python versions are supported:
 
-* `Python 3.6 <https://github.com/beeware/Python-Apple-support/tree/3.6>`__
 * `Python 3.7 <https://github.com/beeware/Python-Apple-support/tree/3.7>`__
 * `Python 3.8 <https://github.com/beeware/Python-Apple-support/tree/3.8>`__
 * `Python 3.9 <https://github.com/beeware/Python-Apple-support/tree/3.9>`__
@@ -48,3 +47,4 @@ maintained:
 * `Python 2.7 <https://github.com/beeware/Python-Apple-support/tree/2.7>`__ (EOL January 2020)
 * `Python 3.4 <https://github.com/beeware/Python-Apple-support/tree/3.4>`__ (EOL March 2019)
 * `Python 3.5 <https://github.com/beeware/Python-Apple-support/tree/3.5>`__ (EOL February 2021)
+* `Python 3.6 <https://github.com/beeware/Python-Apple-support/tree/3.6>`__ (EOL December 2021)
