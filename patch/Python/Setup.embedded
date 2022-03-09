@@ -6,7 +6,7 @@ _abc _abc.c
 _asyncio _asynciomodule.c
 _bisect _bisectmodule.c
 _blake2 _blake2/blake2module.c _blake2/blake2b_impl.c _blake2/blake2s_impl.c
-_bz2 _bz2module.c -I$(srcdir)/../Support/BZip2/Headers -L$(srcdir)/../Support/BZip2 -lbzip2
+_bz2 _bz2module.c -I$(srcdir)/../Support/BZip2/libbzip2.xcframework/XCFRAMEWORK/Headers -L$(srcdir)/../Support/BZip2/libbzip2.xcframework/XCFRAMEWORK -lbz2
 _codecs _codecsmodule.c
 _codecs_cn cjkcodecs/_codecs_cn.c
 _codecs_hk cjkcodecs/_codecs_hk.c
@@ -23,13 +23,13 @@ _elementtree _elementtree.c \
     -I$(srcdir)/Modules/expat
     -DHAVE_EXPAT_CONFIG_H -DUSE_PYEXPAT_CAPI
 _functools -DPy_BUILD_CORE_BUILTIN -I$(srcdir)/Include/internal _functoolsmodule.c
-_hashlib _hashopenssl.c -I$(srcdir)/../Support/OpenSSL/Headers -L$(srcdir)/../Support/OpenSSL -lOpenSSL -DUSE_SSL
+_hashlib _hashopenssl.c -I$(srcdir)/../Support/OpenSSL/libssl.xcframework/XCFRAMEWORK/Headers -L$(srcdir)/../Support/OpenSSL/libssl.xcframework/XCFRAMEWORK -lOpenSSL -DUSE_SSL
 _heapq _heapqmodule.c
 _io -DPy_BUILD_CORE_BUILTIN -I$(srcdir)/Include/internal -I$(srcdir)/Modules/_io _io/_iomodule.c _io/iobase.c _io/fileio.c _io/bytesio.c _io/bufferedio.c _io/textio.c _io/stringio.c
 _json -I$(srcdir)/Include/internal -DPy_BUILD_CORE_BUILTIN _json.c
 _locale _localemodule.c  # -lintl
 _lsprof _lsprof.c rotatingtree.c
-_lzma _lzmamodule.c -I$(srcdir)/../Support/XZ/Headers -L$(srcdir)/../Support/XZ/ -lxz
+_lzma _lzmamodule.c -I$(srcdir)/../Support/XZ/libxz.xcframework/XCFRAMEWORK/Headers -L$(srcdir)/../Support/XZ/libxz.xcframework/XCFRAMEWORK/ -lxz
 _md5 md5module.c
 _multibytecodec cjkcodecs/multibytecodec.c
 _multiprocessing _multiprocessing/multiprocessing.c _multiprocessing/semaphore.c
@@ -56,7 +56,7 @@ _sqlite3 -I$(srcdir)/Modules/_sqlite -DMODULE_NAME='\"sqlite3\"' -DSQLITE_OMIT_L
     _sqlite/statement.c \
     _sqlite/util.c
 _sre _sre.c
-_ssl _ssl.c -I$(srcdir)/../Support/OpenSSL/Headers -L$(srcdir)/../Support/OpenSSL -lOpenSSL -DUSE_SSL
+_ssl _ssl.c -I$(srcdir)/../Support/OpenSSL/libssl.xcframework/XCFRAMEWORK/Headers -L$(srcdir)/../Support/OpenSSL/libssl.xcframework/XCFRAMEWORK -lOpenSSL -DUSE_SSL
 _stat _stat.c
 _statistics _statisticsmodule.c
 _struct _struct.c

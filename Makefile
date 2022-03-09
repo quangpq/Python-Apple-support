@@ -51,32 +51,20 @@ XZ_VERSION=5.2.5
 LIBFFI_VERSION=3.4.2
 
 # Supported OS
-OS=macOS iOS tvOS watchOS
+OS=iOS
 
 # macOS targets
-TARGETS-macOS=macosx.x86_64 macosx.arm64
+TARGETS-macOS=macosx.arm64
 PYTHON_TARGETS-macOS=macOS
 CFLAGS-macOS=-mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)
 
 # iOS targets
-TARGETS-iOS=iphonesimulator.x86_64 iphoneos.arm64
-CFLAGS-iOS=-mios-version-min=8.0 -fembed-bitcode
-CFLAGS-iphoneos.arm64=
-CFLAGS-iphonesimulator.x86_64=
-
-# tvOS targets
-TARGETS-tvOS=appletvsimulator.x86_64 appletvos.arm64
-CFLAGS-tvOS=-mtvos-version-min=9.0 -fembed-bitcode
-CFLAGS-appletvos.arm64=
-CFLAGS-appletvsimulator.x86_64=
-PYTHON_CONFIGURE-tvOS=ac_cv_func_sigaltstack=no
-
-# watchOS targets
-TARGETS-watchOS=watchsimulator.i386 watchos.armv7k
-CFLAGS-watchOS=-mwatchos-version-min=4.0 -fembed-bitcode
-CFLAGS-watchsimulator.i386=
-CFLAGS-watchos.armv7k=
-PYTHON_CONFIGURE-watchOS=ac_cv_func_sigaltstack=no
+TARGETS-iOS=iphonesimulator.arm64 iphoneos.arm64
+CFLAGS-iOS=
+CFLAGS-iphoneos.arm64=-mios-version-min=12.0 -fembed-bitcode
+CFLAGS-iphonesimulator.arm64=-mios-simulator-version-min=12.0 -fembed-bitcode
+XCFRAMEWORK-iphoneos.arm64=ios-arm64
+XCFRAMEWORK-iphonesimulator.arm64=ios-arm64-simulator
 
 # override machine types for arm64
 MACHINE_DETAILED-arm64=aarch64
@@ -181,10 +169,6 @@ downloads/Python-$(PYTHON_VERSION).tgz:
 	mkdir -p downloads
 	if [ ! -e downloads/Python-$(PYTHON_VERSION).tgz ]; then curl -L https://www.python.org/ftp/python/$(PYTHON_MICRO_VERSION)/Python-$(PYTHON_VERSION).tgz > downloads/Python-$(PYTHON_VERSION).tgz; fi
 
-# Some Python targets needed to identify the host build
-PYTHON_DIR-macOS=build/macOS/Python-$(PYTHON_VERSION)-macOS
-PYTHON_HOST=$(PYTHON_DIR-macOS)/dist/lib/libpython$(PYTHON_VER).a
-
 # Build for specified target (from $(TARGETS))
 #
 # Parameters:
@@ -247,13 +231,16 @@ else
 endif
 
 # Build OpenSSL
-$$(OPENSSL_DIR-$1)/libssl.a $$(OPENSSL_DIR-$1)/libcrypto.a: $$(OPENSSL_DIR-$1)/Makefile
+$$(OPENSSL_DIR-$1)/libopenssl.a: $$(OPENSSL_DIR-$1)/Makefile
 	# Make the build, and install just the software (not the docs)
 	cd $$(OPENSSL_DIR-$1) && \
 		CC="$$(CC-$1)" \
 		CROSS_TOP="$$(dir $$(SDK_ROOT-$1)).." \
 		CROSS_SDK="$$(notdir $$(SDK_ROOT-$1))" \
 		make all && make install_sw
+	
+	xcrun libtool -no_warning_for_no_symbols -static \
+		-o $$(OPENSSL_DIR-$1)/libopenssl.a $$(OPENSSL_DIR-$1)/libssl.a $$(OPENSSL_DIR-$1)/libcrypto.a
 
 # Unpack BZip2
 $$(BZIP2_DIR-$1)/Makefile: downloads/bzip2-$(BZIP2_VERSION).tgz
@@ -285,6 +272,7 @@ $$(XZ_DIR-$1)/Makefile: downloads/xz-$(XZ_VERSION).tgz
 # Build XZ
 $$(XZ_DIR-$1)/src/liblzma/.libs/liblzma.a: $$(XZ_DIR-$1)/Makefile
 	cd $$(XZ_DIR-$1) && make && make install
+	cp -rf $$(XZ_DIR-$1)/src/liblzma/.libs/liblzma.a $$(XZ_DIR-$1)/src/liblzma/.libs/libxz.a
 
 # macOS builds use their own libFFI, and are compiled as a single
 # universal2 build. As a result, the macOS Python build is configured
@@ -292,19 +280,18 @@ $$(XZ_DIR-$1)/src/liblzma/.libs/liblzma.a: $$(XZ_DIR-$1)/Makefile
 ifneq ($2,macOS)
 LIBFFI_BUILD_DIR-$1=build_$$(SDK-$1)-$$(ARCH-$1)
 PYTHON_DIR-$1=build/$2/Python-$(PYTHON_VERSION)-$1
-pyconfig.h-$1=pyconfig-$$(ARCH-$1).h
-PYTHON_HOST-$1=$(PYTHON_HOST)
 
 # Build LibFFI
-$$(LIBFFI_DIR-$1)/libffi.$1.a: $$(LIBFFI_DIR-$1)/darwin_common
+$$(LIBFFI_DIR-$1)/$1/libffi.a: $$(LIBFFI_DIR-$1)/darwin_common
 	cd $$(LIBFFI_DIR-$1)/$$(LIBFFI_BUILD_DIR-$1) && make
 
 	# Copy in the lib to a non-BUILD_DIR dependent location;
 	# include the target in the final filename for disambiguation
-	cp $$(LIBFFI_DIR-$1)/$$(LIBFFI_BUILD_DIR-$1)/.libs/libffi.a $$(LIBFFI_DIR-$1)/libffi.$1.a
+	mkdir -p $$(LIBFFI_DIR-$1)/$1
+	cp $$(LIBFFI_DIR-$1)/$$(LIBFFI_BUILD_DIR-$1)/.libs/libffi.a $$(LIBFFI_DIR-$1)/$1/libffi.a
 
 # Unpack Python
-$$(PYTHON_DIR-$1)/Makefile: downloads/Python-$(PYTHON_VERSION).tgz $$(PYTHON_HOST-$1)
+$$(PYTHON_DIR-$1)/Makefile: downloads/Python-$(PYTHON_VERSION).tgz
 	# Unpack target Python
 	mkdir -p $$(PYTHON_DIR-$1)
 	tar zxf downloads/Python-$(PYTHON_VERSION).tgz --strip-components 1 -C $$(PYTHON_DIR-$1)
@@ -312,11 +299,12 @@ $$(PYTHON_DIR-$1)/Makefile: downloads/Python-$(PYTHON_VERSION).tgz $$(PYTHON_HOS
 	cd $$(PYTHON_DIR-$1) && patch -p1 < $(PROJECT_DIR)/patch/Python/Python.patch
 	# Copy in the embedded module configuration
 	cat $(PROJECT_DIR)/patch/Python/Setup.embedded $(PROJECT_DIR)/patch/Python/Setup.$2 > $$(PYTHON_DIR-$1)/Modules/Setup.local
+	sed -ie 's/XCFRAMEWORK/$$(XCFRAMEWORK-$1)/g' $$(PYTHON_DIR-$1)/Modules/Setup.local
 	# Configure target Python
-	cd $$(PYTHON_DIR-$1) && PATH=$(PROJECT_DIR)/$(PYTHON_DIR-macOS)/dist/bin:$(PATH) ./configure \
+	cd $$(PYTHON_DIR-$1) && ./configure \
 		CC="$$(CC-$1)" LD="$$(CC-$1)" \
 		--host=$$(MACHINE_DETAILED-$1)-apple-$(shell echo $2 | tr '[:upper:]' '[:lower:]') \
-		--build=x86_64-apple-darwin \
+		--build=arm-apple-darwin \
 		--prefix=$(PROJECT_DIR)/$$(PYTHON_DIR-$1)/dist \
 		--without-doc-strings --enable-ipv6 --without-ensurepip \
 		ac_cv_file__dev_ptmx=no ac_cv_file__dev_ptc=no \
@@ -325,10 +313,7 @@ $$(PYTHON_DIR-$1)/Makefile: downloads/Python-$(PYTHON_VERSION).tgz $$(PYTHON_HOS
 # Build Python
 $$(PYTHON_DIR-$1)/dist/lib/libpython$(PYTHON_VER).a: build/$2/Support/OpenSSL build/$2/Support/BZip2 build/$2/Support/XZ build/$2/Support/libFFI $$(PYTHON_DIR-$1)/Makefile
 	# Build target Python
-	cd $$(PYTHON_DIR-$1) && PATH="$(PROJECT_DIR)/$(PYTHON_DIR-macOS)/dist/bin:$(PATH)" make all install
-
-build/$2/$$(pyconfig.h-$1): $$(PYTHON_DIR-$1)/dist/include/python$(PYTHON_VER)/pyconfig.h
-	cp -f $$^ $$@
+	cd $$(PYTHON_DIR-$1) && make all install
 
 endif
 
@@ -345,7 +330,6 @@ vars-$1:
 	@echo "XZ_DIR-$1: $$(XZ_DIR-$1)"
 	@echo "LIBFFI_DIR-$1: $$(LIBFFI_DIR-$1)"
 	@echo "PYTHON_DIR-$1: $$(PYTHON_DIR-$1)"
-	@echo "pyconfig.h-$1: $$(pyconfig.h-$1)"
 
 endef
 
@@ -390,62 +374,49 @@ endif
 # Build OpenSSL
 OpenSSL-$1: $$(OPENSSL_FRAMEWORK-$1)
 
-$$(OPENSSL_FRAMEWORK-$1): build/$1/libssl.a build/$1/libcrypto.a
+$$(OPENSSL_FRAMEWORK-$1): build/$1/libssl.xcframework
 	# Create framework directory structure
 	mkdir -p $$(OPENSSL_FRAMEWORK-$1)
 
-	# Copy the headers
-	cp -f -r $$(OPENSSL_DIR-$$(firstword $$(TARGETS-$1)))/include $$(OPENSSL_FRAMEWORK-$1)/Headers
-
-	# Create the fat library
-	xcrun libtool -no_warning_for_no_symbols -static \
-		-o $$(OPENSSL_FRAMEWORK-$1)/libOpenSSL.a $$^
+	# Copy fat libraries
+	cp -rf build/$1/libssl.xcframework $$(OPENSSL_FRAMEWORK-$1)/libssl.xcframework
 
 
-build/$1/libssl.a: $$(foreach target,$$(TARGETS-$1),$$(OPENSSL_DIR-$$(target))/libssl.a)
+build/$1/libssl.xcframework: $$(foreach target,$$(TARGETS-$1),$$(OPENSSL_DIR-$$(target))/libopenssl.a)
 	mkdir -p build/$1
-	xcrun lipo -create -output $$@ $$^
-
-build/$1/libcrypto.a: $$(foreach target,$$(TARGETS-$1),$$(OPENSSL_DIR-$$(target))/libcrypto.a)
-	mkdir -p build/$1
-	xcrun lipo -create -output $$@ $$^
+	xcodebuild -create-xcframework -output $$@ $(foreach target,$(TARGETS-$1),-library $$(OPENSSL_DIR-$(target))/libopenssl.a -headers $$(OPENSSL_DIR-$$(firstword $$(TARGETS-$1)))/include)
 
 # Build BZip2
 BZip2-$1: $$(BZIP2_FRAMEWORK-$1)
 
-$$(BZIP2_FRAMEWORK-$1): build/$1/bzip2/lib/libbz2.a
+$$(BZIP2_FRAMEWORK-$1): build/$1/bzip2/lib/libbz2.xcframework
 	# Create framework directory structure
 	mkdir -p $$(BZIP2_FRAMEWORK-$1)
 
-	# Copy the headers
-	cp -f -r build/$1/bzip2/include $$(BZIP2_FRAMEWORK-$1)/Headers
-
-	# Create the fat library
-	xcrun libtool -no_warning_for_no_symbols -static \
-		-o $$(BZIP2_FRAMEWORK-$1)/libbzip2.a $$^
+	# Copy fat library
+	cp -rf build/$1/bzip2/lib/libbz2.xcframework $$(BZIP2_FRAMEWORK-$1)/libbzip2.xcframework
 
 
-build/$1/bzip2/lib/libbz2.a: $$(foreach target,$$(TARGETS-$1),$$(BZIP2_DIR-$$(target))/libbz2.a)
+build/$1/bzip2/lib/libbz2.xcframework: $$(foreach target,$$(TARGETS-$1),$$(BZIP2_DIR-$$(target))/libbz2.a)
 	mkdir -p build/$1
-	xcrun lipo -create -o $$@ $$^
+
+	# Build the framework
+	xcodebuild -create-xcframework -output $$@ $(foreach target,$(TARGETS-$1),-library $$(BZIP2_DIR-$(target))/libbz2.a -headers build/$1/bzip2/include)
 
 # Build XZ
 XZ-$1: $$(XZ_FRAMEWORK-$1)
 
-$$(XZ_FRAMEWORK-$1): build/$1/xz/lib/liblzma.a
+$$(XZ_FRAMEWORK-$1): build/$1/xz/lib/libxz.xcframework
 	# Create framework directory structure
 	mkdir -p $$(XZ_FRAMEWORK-$1)
 
-	# Copy the headers
-	cp -f -r build/$1/xz/include $$(XZ_FRAMEWORK-$1)/Headers
+	# Copy fat library
+	cp -rf build/$1/xz/lib/libxz.xcframework $$(XZ_FRAMEWORK-$1)/libxz.xcframework
 
-	# Create the fat library
-	xcrun libtool -no_warning_for_no_symbols -static \
-		-o $$(XZ_FRAMEWORK-$1)/libxz.a $$^
 
-build/$1/xz/lib/liblzma.a: $$(foreach target,$$(TARGETS-$1),$$(XZ_DIR-$$(target))/src/liblzma/.libs/liblzma.a)
+build/$1/xz/lib/libxz.xcframework: $$(foreach target,$$(TARGETS-$1),$$(XZ_DIR-$$(target))/src/liblzma/.libs/liblzma.a)
 	mkdir -p build/$1
-	xcrun lipo -create -o $$@ $$^
+	xcodebuild -create-xcframework -output $$@ $(foreach target,$(TARGETS-$1),-library $$(XZ_DIR-$(target))/src/liblzma/.libs/libxz.a -headers build/$1/xz/include)
 
 # Build libFFI
 libFFI-$1: $$(LIBFFI_FRAMEWORK-$1)
@@ -459,8 +430,6 @@ ifeq ($1,macOS)
 # but are no-ops on macOS.
 $$(LIBFFI_FRAMEWORK-$1):
 
-build/$1/$$(pyconfig.h-$1):
-
 # Unpack Python
 $$(PYTHON_DIR-$1)/Makefile: downloads/Python-$(PYTHON_VERSION).tgz
 	# Unpack target Python
@@ -470,6 +439,7 @@ $$(PYTHON_DIR-$1)/Makefile: downloads/Python-$(PYTHON_VERSION).tgz
 	cd $$(PYTHON_DIR-$1) && patch -p1 < $(PROJECT_DIR)/patch/Python/Python.patch
 	# Copy in the embedded module configuration
 	cat $(PROJECT_DIR)/patch/Python/Setup.embedded $(PROJECT_DIR)/patch/Python/Setup.$1 > $$(PYTHON_DIR-$1)/Modules/Setup.local
+
 	# Configure target Python
 	cd $$(PYTHON_DIR-$1) && MACOSX_DEPLOYMENT_TARGET=$$(MACOSX_DEPLOYMENT_TARGET) ./configure \
 		--prefix=$(PROJECT_DIR)/$$(PYTHON_DIR-$1)/dist \
@@ -480,6 +450,9 @@ $$(PYTHON_DIR-$1)/Makefile: downloads/Python-$(PYTHON_VERSION).tgz
 $$(PYTHON_DIR-$1)/dist/lib/libpython$(PYTHON_VER).a: build/$1/Support/OpenSSL build/$1/Support/BZip2 build/$1/Support/XZ build/$1/Support/libFFI $$(PYTHON_DIR-$1)/Makefile
 	# Build target Python
 	cd $$(PYTHON_DIR-$1) && PATH="$(PROJECT_DIR)/$(PYTHON_DIR-$1)/dist/bin:$(PATH)" make all install
+
+	# Create headers
+
 
 else
 # The LibFFI folder is shared between all architectures for the OS
@@ -493,22 +466,24 @@ $$(LIBFFI_DIR-$1)/darwin_common: downloads/libffi-$(LIBFFI_VERSION).tgz
 	mkdir -p $$(LIBFFI_DIR-$1)
 	tar zxf downloads/libffi-$(LIBFFI_VERSION).tgz --strip-components 1 -C $$(LIBFFI_DIR-$1)
 	# Configure the build
+	cp -f $(PROJECT_DIR)/patch/libffi/generate-darwin-source-and-headers.py $$(LIBFFI_DIR-$1)/generate-darwin-source-and-headers.py
 	cd $$(LIBFFI_DIR-$1) && python generate-darwin-source-and-headers.py --only-$(shell echo $1 | tr '[:upper:]' '[:lower:]')
 
-$$(LIBFFI_FRAMEWORK-$1): $$(LIBFFI_DIR-$1)/libffi.a
+$$(LIBFFI_FRAMEWORK-$1): $$(LIBFFI_DIR-$1)/libffi.xcframework
 	# Create framework directory structure
 	mkdir -p $$(LIBFFI_FRAMEWORK-$1)
 
+	# Copy fat library
+	cp -rf $$(LIBFFI_DIR-$1)/libffi.xcframework $$(LIBFFI_FRAMEWORK-$1)/libFFI.xcframework
+
+
+$$(LIBFFI_DIR-$1)/libffi.xcframework: $$(foreach target,$$(TARGETS-$1),$$(LIBFFI_DIR-$1)/$$(target)/libffi.a)
 	# Copy the headers.
-	cp -f -r $$(LIBFFI_DIR-$1)/darwin_common/include $$(LIBFFI_FRAMEWORK-$1)/Headers
-	cp -f -r $$(LIBFFI_DIR-$1)/darwin_$(shell echo $1 | tr '[:upper:]' '[:lower:]')/include/* $$(LIBFFI_FRAMEWORK-$1)/Headers
+	cp -f -r $$(LIBFFI_DIR-$1)/darwin_common/include $$(LIBFFI_DIR-$1)/Headers
+	cp -f -r $$(LIBFFI_DIR-$1)/darwin_$(shell echo $1 | tr '[:upper:]' '[:lower:]')/include/* $$(LIBFFI_DIR-$1)/Headers
 
-	# Create the fat library
-	xcrun libtool -no_warning_for_no_symbols -static \
-		-o $$(LIBFFI_FRAMEWORK-$1)/libFFI.a $$^
-
-$$(LIBFFI_DIR-$1)/libffi.a: $$(foreach target,$$(TARGETS-$1),$$(LIBFFI_DIR-$1)/libffi.$$(target).a)
-	xcrun lipo -create -o $$@ $$^
+	# Build the framework
+	xcodebuild -create-xcframework -output $$@ $(foreach target,$(TARGETS-$1),-library $$(LIBFFI_DIR-$1)/$(target)/libffi.a -headers $$(LIBFFI_DIR-$1)/Headers)
 
 endif
 
@@ -517,33 +492,21 @@ $1: Python-$1
 Python-$1: dist/Python-$(PYTHON_VER)-$1-support.$(BUILD_NUMBER).tar.gz
 
 # Build Python
-$$(PYTHON_FRAMEWORK-$1): build/$1/libpython$(PYTHON_VER).a $$(foreach target,$$(PYTHON_TARGETS-$1),build/$1/$$(pyconfig.h-$$(target)))
-	mkdir -p $$(PYTHON_RESOURCES-$1)/include/python$(PYTHON_VER)
-
-	# Copy the headers. The headers are the same for every platform, except for pyconfig.h
-	# We ship a master pyconfig.h for iOS, tvOS and watchOS that delegates to architecture
-	# specific versions; on macOS, we can use the original version as-is.
-	cp -f -r $$(PYTHON_DIR-$$(firstword $$(PYTHON_TARGETS-$1)))/dist/include/python$(PYTHON_VER) $$(PYTHON_FRAMEWORK-$1)/Headers
-ifneq ($1,macOS)
-	cp -f $$(filter %.h,$$^) $$(PYTHON_FRAMEWORK-$1)/Headers
-	cp -f $(PROJECT_DIR)/patch/Python/pyconfig-$1.h $$(PYTHON_FRAMEWORK-$1)/Headers/pyconfig.h
-endif
-	# Copy Python.h and pyconfig.h into the resources include directory
-	cp -f -r $$(PYTHON_FRAMEWORK-$1)/Headers/pyconfig*.h $$(PYTHON_RESOURCES-$1)/include/python$(PYTHON_VER)
-	cp -f -r $$(PYTHON_FRAMEWORK-$1)/Headers/Python.h $$(PYTHON_RESOURCES-$1)/include/python$(PYTHON_VER)
-
+$$(PYTHON_FRAMEWORK-$1): build/$1/libpython$(PYTHON_VER).xcframework
 	# Copy the standard library from the simulator build
-	cp -f -r $$(PYTHON_DIR-$$(firstword $$(PYTHON_TARGETS-$1)))/dist/lib $$(PYTHON_RESOURCES-$1)
+	mkdir -p $$(PYTHON_RESOURCES-$1)
+	cp -f -r $$(PYTHON_DIR-$$(firstword $$(PYTHON_TARGETS-$1)))/dist/lib/python$(PYTHON_VER) $$(PYTHON_RESOURCES-$1)
 
 	# Copy fat library
-	cp -f $$(filter %.a,$$^) $$(PYTHON_FRAMEWORK-$1)/libPython.a
+	cp -rf $$(filter %.xcframework,$$^) $$(PYTHON_FRAMEWORK-$1)/libPython.xcframework
 
 
 # Build libpython fat library
-build/$1/libpython$(PYTHON_VER).a: $$(foreach target,$$(PYTHON_TARGETS-$1),$$(PYTHON_DIR-$$(target))/dist/lib/libpython$(PYTHON_VER).a)
-	# Create a fat binary for the libPython library
+build/$1/libpython$(PYTHON_VER).xcframework: $$(foreach target,$$(PYTHON_TARGETS-$1),$$(PYTHON_DIR-$$(target))/dist/lib/libpython$(PYTHON_VER).a)
 	mkdir -p build/$1
-	xcrun lipo -create -output $$@ $$^
+	# Create a fat binary for the libPython library
+	xcodebuild -create-xcframework -output $$@ $$(foreach target,$$(PYTHON_TARGETS-$1),-library $$(PYTHON_DIR-$$(target))/dist/lib/libpython$(PYTHON_VER).a -headers $$(PYTHON_DIR-$$(target))/dist/include/python$(PYTHON_VER))
+
 
 vars-$1: $$(foreach target,$$(TARGETS-$1),vars-$$(target))
 	@echo "OPENSSL_FRAMEWORK-$1: $$(OPENSSL_FRAMEWORK-$1)"
